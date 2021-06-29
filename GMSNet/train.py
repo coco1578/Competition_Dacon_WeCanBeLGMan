@@ -174,6 +174,9 @@ def train():
 
                 train_loss.reset()
 
+            else:
+                wandb.log({"global_steps": global_step})
+
 
 if __name__ == "__main__":
 
