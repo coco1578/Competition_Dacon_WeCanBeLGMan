@@ -112,7 +112,7 @@ def train():
         pin_memory=True,
         num_workers=args.job,
     )
-    valid_dataset = BaseDataset(X_test, y_test)
+    valid_dataset = BaseDataset(X_test, y_test, train=False)
     valid_loader = DataLoader(
         valid_dataset,
         batch_size=args.batch_size,
