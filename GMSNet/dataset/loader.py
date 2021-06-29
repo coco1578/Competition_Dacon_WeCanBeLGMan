@@ -41,6 +41,8 @@ class BaseDataset(Dataset):
         label = self.labels[index]
 
         image, label = get_npy(image), get_npy(label)
-        image, label = self.transformer(image), self.transformer(label)
+        image, label = self.transformer.transform(image), self.transformer.transform(
+            label
+        )
 
         return image, label

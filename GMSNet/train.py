@@ -5,6 +5,7 @@ import argparse
 import tqdm
 import torch
 import torch.nn as nn
+import wandb
 import numpy as np
 
 from torch.utils.data import DataLoader
@@ -18,7 +19,10 @@ from dataset.loader import BaseDataset
 def parse_args():
 
     parser = argparse.ArgumentParser(description="Dacon LG Contest")
-    parser.add_argument("-b", "--batch-size", default=32, type=int, help="batch size")
+    parser.add_argument(
+        "-a", "--arch", default="GMSNet", type=str, help="model architecture"
+    )
+    parser.add_argument("-b", "--batch-size", default=16, type=int, help="batch size")
     parser.add_argument("-j", "--job", default=4, type=int, help="number of workers")
     parser.add_argument("-e", "--epochs", default=6000, type=int, help="max epoch")
     parser.add_argument("-s", "--step", default=1000, type=int, help="step size")
@@ -74,14 +78,19 @@ def train():
     args = parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+    wandb.login()
+    wandb.init(project="Dacon", entity="coco1578", name=args.arch)
+
     global_step = 0
     best_loss = np.inf
 
     model = GMSNet()
-    model_info = torch.load("", map_location="cpu")
+    model_info = torch.load(
+        "/home/salmon21/LG/WeCanBeLGMan/save_model/gmsnet/best_model.pth.tar",
+        map_location="cpu",
+    )
     model.load_state_dict(model_info["state_dict"], strict=False)
-    optimizer = torch.optim.Adam(model.parameters())
-    optimizer.load_state_dict(model_info["optimizer"])
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
 
     criterion = nn.L1Loss()
@@ -128,7 +137,7 @@ def train():
             train_losses.update(train_loss, len(batch[0]))
             global_step += 1
 
-            description = f"EPOCH:[{epoch + 1}] - STEP:[{global_step}] - LOSS:[{train_loss.avg:.4f}]"
+            description = f"EPOCH:[{epoch + 1}] - STEP:[{global_step}] - LOSS:[{train_losses.avg:.4f}]"
             progress_bar.set_description(description)
 
             if global_step % args.step == 0:
@@ -147,9 +156,22 @@ def train():
                                 "optimizer": optimizer.state_dict(),
                                 "scheduler": scheduler.state_dict(),
                             },
-                            os.path.join("/home/salmon21/LG/", "checkpoint.pth"),
+                            os.path.join(
+                                "/home/salmon21/LG/WeCanBeLGMan/save_model/gmsnet",
+                                "checkpoint.pth",
+                            ),
                         )
                 scheduler.step()
+
+                wandb.log(
+                    {
+                        "train/lr": scheduler.get_last_lr()[0],
+                        "train/loss": train_losses.avg,
+                        "valid/loss": valid_loss,
+                        "global_steps": global_step,
+                    }
+                )
+
                 train_loss.reset()
 
 
