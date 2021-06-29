@@ -79,7 +79,7 @@ def train():
 
     model = GMSNet()
     model_info = torch.load("", map_location="cpu")
-    model.load_state_dict(model_info["state_dict"])
+    model.load_state_dict(model_info["state_dict"], strict=False)
     optimizer = torch.optim.Adam(model.parameters())
     optimizer.load_state_dict(model_info["optimizer"])
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
@@ -117,7 +117,7 @@ def train():
     for epoch in tqdm.tqdm(range(args.epochs)):
         progress_bar = tqdm.tqdm(
             enumerate(train_loader),
-            total=int(len(train_loader) / args.batch),
+            total=int(len(train_loader) / args.batch_size),
             position=0,
             leave=True,
         )
@@ -151,3 +151,8 @@ def train():
                         )
                 scheduler.step()
                 train_loss.reset()
+
+
+if __name__ == "__main__":
+
+    train()

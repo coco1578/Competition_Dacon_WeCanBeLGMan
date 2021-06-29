@@ -45,7 +45,7 @@ class ResGroup(nn.Module):
             if len(num_groups) > 1:
                 self.blocks.append(ResGroup(planes, num_groups[1:]))
             else:
-                self.blocks.append(ResGroup(planes))
+                self.blocks.append(ResLayer(planes))
         self.fuse = nn.Conv2d(self.num_blocks * planes, planes, kernel_size=1)
 
     def forward(self, x):
