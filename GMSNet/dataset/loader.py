@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 def get_npy(image):
 
     image = np.load(image)
-    image = image.astype(np.float32) / 255.0
+    # image = image.astype(np.float32) / 255.0
 
     return image
 
@@ -16,7 +16,14 @@ def get_npy(image):
 class Transformer:
     def __init__(self):
 
-        self._compose = transforms.Compose([transforms.ToTensor()])
+        self._compose = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)
+                ),
+            ]
+        )
         self._aug_transformer = A.Compose(
             [
                 A.OneOf(
@@ -42,11 +49,11 @@ class Transformer:
             ]
         )
 
-    def _augmentation(self, image):
+    def augmentation(self, image):
 
         return self._aug_transformer(image=image)["image"]
 
-    def _vectorize(self, image):
+    def vectorize(self, image):
 
         return self._compose(image)
 
@@ -79,7 +86,9 @@ class BaseDataset(Dataset):
         image, label = get_npy(image), get_npy(label)
 
         if self._train:
-            image = self.transformer.transform(image, self._train)
-        label = self.transformer.transform(label)
+            image = self.transformer.augmentation(image, self._train)
+        # else:
+        image = self.transformer.vectorize(image)
+        label = self.transformer.vectorize(label)
 
         return image, label
