@@ -49,7 +49,9 @@ def train_batch(batch, model, criterion, optimizer, device):
     loss.backward()
     optimizer.step()
 
-    return loss.data.cpu().item()
+    return loss.data.cpu().item(), psnr_score(
+        outputs.data.cpu().detach().numpy(), labels.cpu().detach().numpy()
+    )
 
 
 def valid_batch(valid_loader, model, criterion, device):
@@ -57,6 +59,7 @@ def valid_batch(valid_loader, model, criterion, device):
     model.eval()
 
     valid_loss = AverageMeter()
+    valid_psnr_scores = AverageMeter()
 
     for batch in valid_loader:
 
@@ -67,10 +70,17 @@ def valid_batch(valid_loader, model, criterion, device):
         loss = criterion(outputs, label)
 
         valid_loss.update(loss.data.cpu().item(), len(image))
+        valid_psnr_scores.update(
+            psnr_score(
+                outputs.data.cpu().detach().numpy(), label.cpu().detach().numpy()
+            ),
+            len(image),
+        )
 
     val_loss = valid_loss.avg
+    val_psnr_score = valid_psnr_scores.avg
 
-    return val_loss
+    return val_loss, val_psnr_score
 
 
 def train():
@@ -97,11 +107,11 @@ def train():
 
     model, criterion = model.to(device), criterion.to(device)
 
-    inputs = sorted(glob.glob("/home/salmon21/LG/dataset/train/input/*.npy"))
-    labels = sorted(glob.glob("/home/salmon21/LG/dataset/train/label/*.npy"))
+    inputs = sorted(glob.glob("/home/salmon21/LG/dataset/train/input/204_102/*.npy"))
+    labels = sorted(glob.glob("/home/salmon21/LG/dataset/train/label/204_102/*.npy"))
 
     X_train, X_test, y_train, y_test = train_test_split(
-        inputs, labels, test_size=0.3, random_state=5252
+        inputs, labels, test_size=0.25, random_state=5252
     )
 
     train_dataset = BaseDataset(X_train, y_train)
@@ -122,6 +132,7 @@ def train():
     )
 
     train_losses = AverageMeter()
+    train_psnr_scores = AverageMeter()
 
     for epoch in tqdm.tqdm(range(args.epochs)):
         progress_bar = tqdm.tqdm(
@@ -133,8 +144,11 @@ def train():
 
         for index, batch in progress_bar:
 
-            train_loss = train_batch(batch, model, criterion, optimizer, device)
+            train_loss, train_psnr_score = train_batch(
+                batch, model, criterion, optimizer, device
+            )
             train_losses.update(train_loss, len(batch[0]))
+            train_psnr_scores.update(train_psnr_score, len(batch[0]))
             global_step += 1
 
             description = f"EPOCH:[{epoch + 1}] - STEP:[{global_step}] - LOSS:[{train_losses.avg:.4f}]"
@@ -143,7 +157,9 @@ def train():
             if global_step % args.step == 0:
 
                 with torch.no_grad():
-                    valid_loss = valid_batch(valid_loader, model, criterion, device)
+                    valid_loss, valid_psnr_score = valid_batch(
+                        valid_loader, model, criterion, device
+                    )
 
                     if valid_loss < best_loss:
 
@@ -152,6 +168,7 @@ def train():
                         torch.save(
                             {
                                 "loss": best_loss,
+                                "psnr_score": valid_psnr_score,
                                 "state_dict": model.state_dict(),
                                 "optimizer": optimizer.state_dict(),
                                 "scheduler": scheduler.state_dict(),
@@ -167,12 +184,15 @@ def train():
                     {
                         "train/lr": scheduler.get_last_lr()[0],
                         "train/loss": train_losses.avg,
+                        "train/psnr_score": train_psnr_score,
                         "valid/loss": valid_loss,
+                        "valid/psnr_score": valid_psnr_score,
                         "global_steps": global_step,
                     }
                 )
 
-                train_loss.reset()
+                train_losses.reset()
+                train_psnr_scores.reset()
 
             else:
                 wandb.log({"global_steps": global_step})
