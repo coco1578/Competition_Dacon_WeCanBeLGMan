@@ -13,16 +13,16 @@ from sklearn.model_selection import train_test_split
 
 from model.cbdnet import Network, fixed_loss
 from utils.common import AverageMeter, psnr_score
-from dataset.loader import BaseDataset
+from dataset.loader import RealDataset, SynDataset
 
 
 def parse_args():
 
     parser = argparse.ArgumentParser(description="Dacon LG Contest")
     parser.add_argument(
-        "-a", "--arch", default="GMSNet", type=str, help="model architecture"
+        "-a", "--arch", default="CBDNet", type=str, help="model architecture"
     )
-    parser.add_argument("-b", "--batch-size", default=16, type=int, help="batch size")
+    parser.add_argument("-b", "--batch-size", default=128, type=int, help="batch size")
     parser.add_argument("-j", "--job", default=4, type=int, help="number of workers")
     parser.add_argument("-e", "--epochs", default=6000, type=int, help="max epoch")
     parser.add_argument("-s", "--step", default=1000, type=int, help="step size")
@@ -50,7 +50,8 @@ def train_batch(batch, model, criterion, optimizer, device):
     optimizer.step()
 
     return loss.data.cpu().item(), psnr_score(
-        outputs.data.cpu().detach().numpy(), labels.cpu().detach().numpy()
+        outputs.data.cpu().detach().numpy().astype(float),
+        labels.cpu().detach().numpy().astype(float),
     )
 
 
@@ -72,7 +73,8 @@ def valid_batch(valid_loader, model, criterion, device):
         valid_loss.update(loss.data.cpu().item(), len(image))
         valid_psnr_scores.update(
             psnr_score(
-                outputs.data.cpu().detach().numpy(), label.cpu().detach().numpy()
+                outputs.data.cpu().detach().numpy().astype(float),
+                label.cpu().detach().numpy().astype(float),
             ),
             len(image),
         )
@@ -108,13 +110,21 @@ def train():
     model, criterion = model.to(device), criterion.to(device)
 
     inputs = sorted(glob.glob("/home/salmon21/LG/dataset/train/input/204_102/*.npy"))
+    noise = sorted(
+        glob.glob("/home/salmon21/LG/dataset/train/input/204_102_noise/*.npy")
+    )
+    sigma = sorted(
+        glob.glob("/home/salmon21/LG/dataset/train/input/204_102_sigma/*.npy")
+    )
+
     labels = sorted(glob.glob("/home/salmon21/LG/dataset/train/label/204_102/*.npy"))
+    gt = sorted(glob.glob("/home/salmon21/LG/dataset/train/label/204_102_gt/*.npy"))
 
     X_train, X_test, y_train, y_test = train_test_split(
         inputs, labels, test_size=0.25, random_state=5252
     )
 
-    train_dataset = BaseDataset(X_train, y_train)
+    train_dataset = RealDataset(X_train, y_train) + SynDataset(noise, sigma)
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
@@ -122,7 +132,7 @@ def train():
         pin_memory=True,
         num_workers=args.job,
     )
-    valid_dataset = BaseDataset(X_test, y_test, train=False)
+    valid_dataset = RealDataset(X_test, y_test, train=False)
     valid_loader = DataLoader(
         valid_dataset,
         batch_size=args.batch_size,
@@ -151,7 +161,7 @@ def train():
             train_psnr_scores.update(train_psnr_score, len(batch[0]))
             global_step += 1
 
-            description = f"EPOCH:[{epoch + 1}] - STEP:[{global_step}] - LOSS:[{train_losses.avg:.4f}]"
+            description = f"EPOCH:[{epoch + 1}] - STEP:[{global_step}] - LOSS:[{train_losses.avg:.4f}] - PSNR:[{train_psnr_scores.avg:.4f}]"
             progress_bar.set_description(description)
 
             if global_step % args.step == 0:
@@ -174,7 +184,7 @@ def train():
                                 "scheduler": scheduler.state_dict(),
                             },
                             os.path.join(
-                                "/home/salmon21/LG/WeCanBeLGMan/save_model/gmsnet",
+                                "/home/salmon21/LG/WeCanBeLGMan/save_model/cbdnet",
                                 "checkpoint.pth",
                             ),
                         )

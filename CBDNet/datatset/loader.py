@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import albumentations as A
 import torchvision.transforms as transforms
@@ -8,7 +10,6 @@ from torch.utils.data import Dataset
 def get_npy(image):
 
     image = np.load(image)
-    # image = image.astype(np.float32) / 255.0
 
     return image
 
@@ -66,7 +67,7 @@ class Transformer:
         return image
 
 
-class BaseDataset(Dataset):
+class RealDataset(Dataset):
     def __init__(self, inputs, labels, train=True):
 
         self.inputs = inputs
@@ -86,9 +87,38 @@ class BaseDataset(Dataset):
         image, label = get_npy(image), get_npy(label)
 
         if self._train:
-            image = self.transformer.augmentation(image, self._train)
-        # else:
+            image = self.transformer.augmentation(image)
         image = self.transformer.vectorize(image)
         label = self.transformer.vectorize(label)
 
-        return image, label
+        return image, label, np.zeros((3, 204, 204)), np.zeros((3, 204, 204))
+
+
+class SynDataset(Dataset):
+    def __init__(self, noise, sigma):
+
+        self.noise = noise
+        self.sigman = sigma
+        self.transformer = Transformer()
+
+    def __len__(self):
+
+        return len(self.noise)
+
+    def __getitem__(self, index):
+
+        noise = self.noise[index]
+        sigma = self.sigma[index]
+
+        clean = os.path.join(
+            "/home/salmon21/LG/dataset/train/input/204_102", os.path.basename(noise)
+        )
+
+        clean, noise, sigma = get_npy(clean), get_npy(noise), get_npy(sigma)
+
+        # else:
+        clean = self.transformer.vectorize(clean)
+        noise = self.transformer.vectorize(noise)
+        sigma = self.transformer.vectorize(sigma) / 15.0  # inverse scaling
+
+        return noise, clean, sigma, np.ones((3, 204, 204))
