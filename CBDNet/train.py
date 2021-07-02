@@ -41,9 +41,11 @@ def train_batch(batch, model, criterion, optimizer, device):
 
     images = batch[0].to(device)
     labels = batch[1].to(device)
+    sigmas = batch[2].to(device)
+    flags = batch[3].to(device)
 
     noise_level_est, outputs = model(images)
-    loss = criterion(outputs, labels, noise_level_est, 0, 0)
+    loss = criterion(outputs, labels, noise_level_est, sigmas, flags)
 
     optimizer.zero_grad()
     loss.backward()
