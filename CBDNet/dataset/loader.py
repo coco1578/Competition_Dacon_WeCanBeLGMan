@@ -98,7 +98,7 @@ class SynDataset(Dataset):
     def __init__(self, noise, sigma):
 
         self.noise = noise
-        self.sigman = sigma
+        self.sigma = sigma
         self.transformer = Transformer()
 
     def __len__(self):
