@@ -117,7 +117,7 @@ def train():
     model.load_state_dict(model_info["state_dict"], strict=False)
     optimizer = torch.optim.AdamW(model.parameters(), lr=5e-6)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=10, min_eta=1e-6
+        optimizer, T_max=10, eta_min=1e-6
     )
     transformer = transforms.Compose([transforms.ToTensor()])
 
