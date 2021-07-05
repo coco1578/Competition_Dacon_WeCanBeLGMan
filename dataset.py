@@ -1,6 +1,7 @@
 import os
 import glob
 
+import torch
 import numpy as np
 import albumentations as A
 import torchvision.transforms as transforms
@@ -18,11 +19,7 @@ def get_npy(image):
 class Transformer:
     def __init__(self):
 
-        self._compose = transforms.Compose(
-            [
-                transforms.ToTensor(),
-            ]
-        )
+        self._compose = transforms.Compose([transforms.ToTensor()])
         self._pixel_augmentor = A.Compose(
             [
                 A.OneOf([A.Blur(), A.GaussianBlur()]),
@@ -42,24 +39,24 @@ class Transformer:
     def _horizontal_flip(self, image, label):
         f = np.random.randint(2)
         if f == 0:
-            image = np.fliplr(image)
-            label = np.fliplr(label)
+            image = torch.flip(image, [1])
+            label = torch.flip(label, [1])
 
         return image, label
 
     def _vertical_flip(self, image, label):
         f = np.random.randint(2)
         if f == 0:
-            image = np.flipud(image)
-            label = np.flipud(label)
+            image = torch.flip(image, [0])
+            label = torch.flip(label, [0])
 
         return image, label
 
     def _random_rotate90(self, image, label):
         k = np.random.randint(4)
 
-        image = np.rot90(image, k)
-        label = np.rot90(label, k)
+        image = torch.rot90(image, k)
+        label = torch.rot90(label, k)
 
         return image, label
 
@@ -78,9 +75,9 @@ class Transformer:
 
     def transform(self, image, label, train=True):
 
+        image, label = self._vectorize(image, label)
         if train:
             image, label = self._augmentation(image, label)
-        image, label = self._vectorize(image, label)
 
         return image, label
 
