@@ -20,21 +20,6 @@ class Transformer:
     def __init__(self):
 
         self._compose = transforms.Compose([transforms.ToTensor()])
-        self._pixel_augmentor = A.Compose(
-            [
-                A.OneOf([A.Blur(), A.GaussianBlur()]),
-                A.OneOf(
-                    [
-                        A.ISONoise(),
-                        A.GaussNoise(),
-                        A.MultiplicativeNoise(
-                            multiplier=[0.5, 1.5], elementwise=True, p=1
-                        ),
-                        A.IAAAdditiveGaussianNoise(),
-                    ]
-                ),
-            ]
-        )
 
     def _horizontal_flip(self, image, label):
         f = np.random.randint(2)
@@ -65,7 +50,6 @@ class Transformer:
         image, label = self._horizontal_flip(image, label)
         image, label = self._vertical_flip(image, label)
         image, label = self._random_rotate90(image, label)
-        # image = self._pixel_augmentor(image=image)["image"]
 
         return image, label
 
@@ -75,9 +59,11 @@ class Transformer:
 
     def transform(self, image, label, train=True):
 
-        image, label = self._vectorize(image, label)
         if train:
-            image, label = self._augmentation(image, label)
+            image, label = self._augmentation(
+                torch.from_numpy(image), torch.from_numpy(label)
+            )
+        image, label = self._vectorize(image.numpy(), label.numpy())
 
         return image, label
 

@@ -43,7 +43,7 @@ def valid_on_batch(X_test_dir, y_test_dir, model, criterion, device, transformer
     for X_tes_dir, y_tes_dir in tqdm.tqdm(zip(X_test_dir, y_test_dir)):
         print(X_tes_dir, y_tes_dir)
         valid_loss = []
-        top_lefts = np.load(os.path.join(X_tes_dir, "top_lefts.npy"))
+        top_lefts = np.load(os.path.join(X_tes_dir, "top_lefts", "top_lefts.npy"))
 
         result_X_image = np.zeros((top_lefts[-1][0] + 204, top_lefts[-1][1] + 204, 3))
         result_X_masks = np.zeros((top_lefts[-1][0] + 204, top_lefts[-1][1] + 204, 3))
@@ -57,10 +57,17 @@ def valid_on_batch(X_test_dir, y_test_dir, model, criterion, device, transformer
             y_tes = np.load(os.path.join(y_tes_dir, f"{i}.npy"))
 
             X_tes = transformer(X_tes)
+            X_tes = X_tes.unsqueeze(dim=0)
             X_tes = X_tes.to(device)
 
             noise_level_est, output = model(X_tes)
-            loss = criterion(output, transformer(y_tes), noise_level_est, 0, 0)
+            loss = criterion(
+                output,
+                transformer(y_tes).unsqueeze(dim=0).to(device),
+                noise_level_est,
+                0,
+                0,
+            )
 
             output = output.cpu().detach().squeeze().permute(1, 2, 0).numpy()
             output = np.uint8(output * 255.0)
@@ -155,7 +162,7 @@ def train():
             leave=True,
         )
 
-        for index, batch in train_loader:
+        for index, batch in progress_bar:
             train_loss = train_on_batch(batch, model, criterion, optimizer, device)
             train_losses.update(train_loss, len(batch[0]))
             global_step += 1
