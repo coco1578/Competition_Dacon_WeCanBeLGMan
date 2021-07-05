@@ -86,7 +86,7 @@ class BaseDataset(Dataset):
         image, label = get_npy(image), get_npy(label)
 
         if self._train:
-            image = self.transformer.augmentation(image, self._train)
+            image = self.transformer.augmentation(image)
         # else:
         image = self.transformer.vectorize(image)
         label = self.transformer.vectorize(label)

@@ -59,7 +59,7 @@ def valid_batch(valid_loader, model, criterion, device):
     model.eval()
 
     valid_loss = AverageMeter()
-    valid_psnr_scores = AverageMeter()
+    valid_psnr_scores = []
 
     for batch in valid_loader:
 
@@ -70,7 +70,7 @@ def valid_batch(valid_loader, model, criterion, device):
         loss = criterion(outputs, label)
 
         valid_loss.update(loss.data.cpu().item(), len(image))
-        valid_psnr_scores.update(
+        valid_psnr_scores.append(
             psnr_score(
                 outputs.data.cpu().detach().numpy(), label.cpu().detach().numpy()
             ),
@@ -78,7 +78,7 @@ def valid_batch(valid_loader, model, criterion, device):
         )
 
     val_loss = valid_loss.avg
-    val_psnr_score = valid_psnr_scores.avg
+    val_psnr_score = np.mean(valid_psnr_scores)
 
     return val_loss, val_psnr_score
 
@@ -132,7 +132,7 @@ def train():
     )
 
     train_losses = AverageMeter()
-    train_psnr_scores = AverageMeter()
+    # train_psnr_scores = AverageMeter()
 
     for epoch in tqdm.tqdm(range(args.epochs)):
         progress_bar = tqdm.tqdm(
@@ -148,10 +148,10 @@ def train():
                 batch, model, criterion, optimizer, device
             )
             train_losses.update(train_loss, len(batch[0]))
-            train_psnr_scores.update(train_psnr_score, len(batch[0]))
+            # train_psnr_scores.update(train_psnr_score, len(batch[0]))
             global_step += 1
 
-            description = f"EPOCH:[{epoch + 1}] - STEP:[{global_step}] - LOSS:[{train_losses.avg:.4f}]"
+            description = f"EPOCH:[{epoch + 1}] - STEP:[{global_step}] - LOSS:[{train_psnr_score:.4f}]"
             progress_bar.set_description(description)
 
             if global_step % args.step == 0:
@@ -192,7 +192,7 @@ def train():
                 )
 
                 train_losses.reset()
-                train_psnr_scores.reset()
+                # train_psnr_scores.reset()
 
             else:
                 wandb.log({"global_steps": global_step})

@@ -16,6 +16,32 @@ from dataset.loader import BaseDataset
 from torchvision.utils import save_image
 
 
+top_lefts = np.load("top_lefts.npy")
+image = np.zeros((2448, 3264, 3))
+mask = np.zeros((2448, 3264, 3))
+
+
+def recover_image(patch):
+
+    for i in range(len(top_lefts)):
+        image[
+            top_lefts[i][0] : top_lefts[i][0] + 204,
+            top_lefts[i][1] : top_lefts[i][1] + 204,
+            :,
+        ] += patch
+        mask[
+            top_lefts[i][0] : top_lefts[i][0] + 204,
+            top_lefts[i][1] : top_lefts[i][1] + 204,
+            :,
+        ] += 1
+
+    image = image / mask
+    image = np.uint8(image)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    return image
+
+
 def submit():
 
     transformer = transforms.Compose([transforms.ToTensor()])
