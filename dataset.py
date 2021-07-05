@@ -63,16 +63,11 @@ class Transformer:
 
         return image, label
 
-    def _image_augmentation(self, image, label):
+    def _augmentation(self, image, label):
 
         image, label = self._horizontal_flip(image, label)
         image, label = self._vertical_flip(image, label)
         image, label = self._random_rotate90(image, label)
-
-        return image, label
-
-    def _pixel_augmentation(self, image, label):
-
         image = self._pixel_augmentor(image=image)["image"]
 
         return image, label
@@ -84,10 +79,8 @@ class Transformer:
     def transform(self, image, label, train=True):
 
         if train:
-            image, label = self._image_augmentation(image, label)
+            image, label = self._augmentation(image, label)
         image, label = self._vectorize(image, label)
-        if train:
-            image, label = self._pixel_augmentation(image, label)
 
         return image, label
 
