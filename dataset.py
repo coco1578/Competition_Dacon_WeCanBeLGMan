@@ -65,7 +65,7 @@ class Transformer:
         image, label = self._horizontal_flip(image, label)
         image, label = self._vertical_flip(image, label)
         image, label = self._random_rotate90(image, label)
-        image = self._pixel_augmentor(image=image)["image"]
+        # image = self._pixel_augmentor(image=image)["image"]
 
         return image, label
 
