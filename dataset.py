@@ -20,6 +20,22 @@ class Transformer:
     def __init__(self):
 
         self._compose = transforms.Compose([transforms.ToTensor()])
+        # TODO: Not use yet
+        self._pixel_augmentor = A.Compose(
+            [
+                A.OneOf([A.Blur(), A.GaussianBlur()]),
+                A.OneOf(
+                    [
+                        A.ISONoise(),
+                        A.GaussNoise(),
+                        A.MultiplicativeNoise(
+                            multiplier=[0.5, 1.5], elementwise=True, p=1
+                        ),
+                        A.IAAAdditiveGaussianNoise(),
+                    ]
+                ),
+            ]
+        )
 
     def _horizontal_flip(self, image, label):
         f = np.random.randint(2)

@@ -2,33 +2,45 @@ import os
 import math
 
 import cv2
+import torch
 import numpy as np
 
 
-def recover_image(path, image_size=204):
+def recover_image(path, model, device, image_size=256):
 
     top_lefts = np.load(os.path.join(path, "top_lefts.npy"))
-    result_image = np.zeros(
-        (top_lefts[-1][0] + image_size, top_lefts[-1][1] + image_size, 3)
-    )
-    result_masks = np.zeros(
-        (top_lefts[-1][0] + image_size, top_lefts[-1][1] + image_size, 3)
-    )
+    result_image = np.zeros((2448, 3264, 3))
+    result_mask = np.zeros((2448, 3264, 3))
 
     for i in range(len(top_lefts)):
-        npy_path = os.path.join(path, f"{i}.npy")
-        result_image[
-            top_lefts[i][0] : top_lefts[i][0] + image_size,
-            top_lefts[i][1] : top_lefts[i][1] + image_size,
+
+        piece = np.load(os.path.join(path, f"{i}.npy"))
+        piece = torch.from_numpy(piece).permute(2, 0, 1)
+        piece = piece.unsqueeze(dim=0)
+        piece = piece.to(device)
+
+        output = model(piece)
+        output = output.cpu().detach().squeeze().permute(1, 2, 0).numpy()
+        output = output * 255.0
+
+        h, w, c = result_image[
+            top_lefts[i][0] : top_lefts[i][0] + 256,
+            top_lefts[i][1] : top_lefts[i][1] + 256,
             :,
-        ] += np.load(npy_path)
-        result_masks[
-            top_lefts[i][0] : top_lefts[i][0] + image_size,
-            top_lefts[i][1] : top_lefts[i][1] + image_size,
+        ].shape
+
+        result_image[
+            top_lefts[i][0] : top_lefts[i][0] + 256,
+            top_lefts[i][1] : top_lefts[i][1] + 256,
+            :,
+        ] += output
+        result_mask[
+            top_lefts[i][0] : top_lefts[i][0] + 256,
+            top_lefts[i][1] : top_lefts[i][1] + 256,
             :,
         ] += 1
 
-    result_image = result_image / result_masks
+    result_image = result_image / result_mask
     result_image = np.uint8(result_image)
     result_image = cv2.cvtColor(result_image, cv2.COLOR_BGR2RGB)
 
