@@ -20,7 +20,6 @@ class Transformer:
     def __init__(self):
 
         self._compose = transforms.Compose([transforms.ToTensor()])
-        # TODO: Not use yet
         self._pixel_augmentor = A.Compose(
             [
                 A.OneOf([A.Blur(), A.GaussianBlur()]),
@@ -31,41 +30,23 @@ class Transformer:
                         A.MultiplicativeNoise(
                             multiplier=[0.5, 1.5], elementwise=True, p=1
                         ),
-                        A.IAAAdditiveGaussianNoise(),
                     ]
                 ),
             ]
         )
-
-    def _horizontal_flip(self, image, label):
-        f = np.random.randint(2)
-        if f == 0:
-            image = torch.flip(image, [1])
-            label = torch.flip(label, [1])
-
-        return image, label
-
-    def _vertical_flip(self, image, label):
-        f = np.random.randint(2)
-        if f == 0:
-            image = torch.flip(image, [0])
-            label = torch.flip(label, [0])
-
-        return image, label
-
-    def _random_rotate90(self, image, label):
-        k = np.random.randint(4)
-
-        image = torch.rot90(image, k)
-        label = torch.rot90(label, k)
-
-        return image, label
+        self._location_augmentor = A.Compose(
+            [A.HorizontalFlip(p=0.5), A.VerticalFlip(p=0.5), A.RandomRotate90(p=0.5)],
+            additional_targets={"label": "image"},
+        )
 
     def _augmentation(self, image, label):
 
-        image, label = self._horizontal_flip(image, label)
-        image, label = self._vertical_flip(image, label)
-        image, label = self._random_rotate90(image, label)
+        location_augmented_data = self._location_augmentor(image=image, label=label)
+        image, label = (
+            location_augmented_data["image"],
+            location_augmented_data["label"],
+        )
+        image = self._pixel_augmentor(image=image)["image"]
 
         return image, label
 
@@ -76,10 +57,8 @@ class Transformer:
     def transform(self, image, label, train=True):
 
         if train:
-            image, label = self._augmentation(
-                torch.from_numpy(image), torch.from_numpy(label)
-            )
-        image, label = self._vectorize(image.numpy(), label.numpy())
+            image, label = self._augmentation(image, label)
+        image, label = self._vectorize(image, label)
 
         return image, label
 
