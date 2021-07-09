@@ -112,7 +112,7 @@ def valid_on_batch(
                 top_lefts[i][0] : top_lefts[i][0] + 256,
                 top_lefts[i][1] : top_lefts[i][1] + 256,
                 :,
-            ] += output
+            ] += output[:h, :w]
             result_X_masks[
                 top_lefts[i][0] : top_lefts[i][0] + 256,
                 top_lefts[i][1] : top_lefts[i][1] + 256,
@@ -201,7 +201,7 @@ def train():
         with torch.no_grad():
 
             valid_loss, valid_psnr_score = valid_on_batch(
-                X_test_dir, y_test_dir, model, criterion, device, transformer
+                X_test_dir, y_test_dir, model, criterion, device, transformer, epoch
             )
 
             if valid_psnr_score > save_psnr_score:
