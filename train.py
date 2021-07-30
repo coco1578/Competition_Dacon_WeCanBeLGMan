@@ -13,10 +13,10 @@ import segmentation_models_pytorch as smp
 
 from sklearn.model_selection import train_test_split
 from torch.utils.data.dataloader import DataLoader
+from IQA_pytorch import MS_SSIM  # for ms_ssim loss
 
 from dataset import ImageDataset
-from CBDNet.model.cbdnet import Network, fixed_loss
-from utils import recover_image, psnr_score, AverageMeter
+from utils import psnr_score, AverageMeter
 
 
 def parse_args():
@@ -39,26 +39,35 @@ def parse_args():
     return parser.parse_args()
 
 
-def train_on_batch(batch, model, criterion, optimizer, device):
+def train_on_batch(batch, model, criterion, optimizer, device, scaler=None):
 
     model.train()
 
     images = batch[0].to(device)
     labels = batch[1].to(device)
 
-    outputs = model(images)
-    loss = criterion(outputs, labels)
+    if scaler is not None:
+        with torch.cuda.amp.autocast():
+            outputs = model(images)
+            loss = criterion(outputs, labels)
 
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
+        optimizer.zero_grad()        
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+
+    else:
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
     return loss.data.cpu().item()
 
 
-def valid_on_batch(
-    X_test_dir, y_test_dir, model, criterion, device, transformer, epoch
-):
+def valid_on_batch(X_test_dir, y_test_dir, model, criterion, device, transformer, epoch, scaler=None):
 
     valid_losses = []
     valid_psnr_scores = []
@@ -66,18 +75,14 @@ def valid_on_batch(
     model.eval()
 
     # TODO: Change hard coding part
-    save_image_foldre = os.path.join(
-        "/home/salmon21/LG/WeCanBeLGMan/save_model/effiunet", str(epoch)
-    )
-    os.makedirs(save_image_foldre)
+    save_image_folder = os.path.join("/home/salmon21/LG/WeCanBeLGMan/save_model/effiunet", str(epoch))
+    os.makedirs(save_image_folder, exist_ok=True)
 
     for X_tes_dir, y_tes_dir in tqdm.tqdm(zip(X_test_dir, y_test_dir)):
         valid_loss = []
         top_lefts = np.load(os.path.join(X_tes_dir, "top_lefts", "top_lefts.npy"))
         image_number = os.path.split(y_tes_dir[:-1])[1].split("_")[0]
-        result_y_image = cv2.imread(
-            f"/home/salmon21/LG/dataset/train/label/train_label_{image_number}.png"
-        )
+        result_y_image = cv2.imread(f"/home/salmon21/LG/dataset/train/label/train_label_{image_number}.png")
 
         # If valid image has small image size (1224, 1632, 3)
         if top_lefts[-1][0] < 2000:
@@ -96,8 +101,13 @@ def valid_on_batch(
             X_tes = X_tes.unsqueeze(dim=0)
             X_tes = X_tes.to(device)
 
-            output = model(X_tes)
-            loss = criterion(output, transformer(y_tes).unsqueeze(dim=0).to(device))
+            if scaler is not None:
+                with torch.cuda.amp.autocast():
+                    output = model(X_tes)
+                    loss = criterion(output, transformer(y_tes).unsqueeze(dim=0).to(device))
+            else:
+                output = model(X_tes)
+                loss = criterion(output, transformer(y_tes).unsqueeze(dim=0).to(device))
 
             output = output.cpu().detach().squeeze().permute(1, 2, 0).numpy()
             output = output * 255.0
@@ -123,11 +133,10 @@ def valid_on_batch(
 
         result_X_image = result_X_image / result_X_masks
         result_X_image = np.uint8(result_X_image)
+        cv2.imwrite(os.path.join(save_image_folder, f"{image_number}.png"), result_X_image)
 
         valid_losses.append(np.mean(valid_loss))
-        valid_psnr_scores.append(
-            psnr_score(result_X_image.astype(float), result_y_image.astype(float))
-        )
+        valid_psnr_scores.append(psnr_score(result_X_image.astype(float), result_y_image.astype(float)))
 
     return np.mean(valid_losses), np.mean(valid_psnr_scores)
 
